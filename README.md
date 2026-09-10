@@ -10,7 +10,7 @@
 
 ---
 
-## 📖 Sobre o projeto
+## Sobre o projeto
 
 Este projeto simula o pipeline de dados de uma fintech que precisa consolidar dados de **transações financeiras** vindas de múltiplas fontes (sistema transacional interno + fontes externas) em um Data Warehouse confiável para análise de negócio (ex: detecção de padrões de fraude, relatórios financeiros, taxas de câmbio aplicadas).
 
