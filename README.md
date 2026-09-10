@@ -1,0 +1,194 @@
+
+# Fintech Data Pipeline
+
+> Pipeline de dados end-to-end para um cenário de fintech, cobrindo ingestão (EL), transformação (T) e modelagem analítica — construído como projeto de estudo aplicado em Engenharia de Dados.
+
+![Status](<https://img.shields.io/badge/status-em%20constru%C3%A7%C3%A3o-yellow>)
+![Airbyte](https://img.shields.io/badge/Airbyte-self--hosted-blue)
+![dbt](https://img.shields.io/badge/dbt-planejado-lightgrey)
+![Snowflake](https://img.shields.io/badge/Snowflake-planejado-lightgrey)
+
+---
+
+## 📖 Sobre o projeto
+
+Este projeto simula o pipeline de dados de uma fintech que precisa consolidar dados de **transações financeiras** vindas de múltiplas fontes (sistema transacional interno + fontes externas) em um Data Warehouse confiável para análise de negócio (ex: detecção de padrões de fraude, relatórios financeiros, taxas de câmbio aplicadas).
+
+O objetivo não é só "fazer funcionar", mas **documentar o raciocínio de engenharia por trás de cada decisão** — arquitetura, trade-offs de custo, qualidade de dados e escalabilidade — como um projeto real de produção exigiria.
+
+**Este é um projeto de aprendizado ativo.** As seções abaixo são atualizadas conforme cada etapa é implementada — não é uma reconstrução retroativa de um projeto "pronto".
+
+---
+
+## Arquitetura
+
+> 🚧 Diagrama completo será adicionado ao final do Bloco de Modelagem de Dados. Visão preliminar abaixo:
+
+```mermaid
+flowchart LR
+    subgraph Fontes
+        A[Postgres - Sistema Transacional<br/>dados sintéticos]
+        B[API Externa<br/>ex: câmbio/BACEN]
+        C[Dataset público<br/>Kaggle - Fraude]
+    end
+
+    subgraph EL["Extract & Load"]
+        D[Airbyte<br/>self-hosted via abctl]
+    end
+
+    subgraph DW["Data Warehouse"]
+        E[(Raw / Bronze)]
+        F[(Staging / Silver)]
+        G[(Marts / Gold)]
+    end
+
+    subgraph T["Transform"]
+        H[dbt]
+    end
+
+    A --> D
+    B --> D
+    C --> D
+    D --> E
+    E --> H
+    H --> F
+    F --> H
+    H --> G
+    G --> I[Looker Studio / BI]
+```
+
+**Padrão adotado:** ELT (Extract-Load-Transform) com arquitetura em camadas (medalhão: Bronze → Silver → Gold).
+
+---
+
+## Stack Tecnológico
+
+| Camada                      | Ferramenta                          | Status             |
+| --------------------------- | ----------------------------------- | ------------------ |
+| Orquestração de ingestão | Airbyte (self-hosted, via`abctl`) | ✅ Instalado       |
+| Fonte transacional          | PostgreSQL (dados sintéticos)      | 🚧 Em construção |
+| Fonte externa               | API pública (câmbio/BACEN)        | 📋 Planejado       |
+| Dataset complementar        | Kaggle (Credit Card Fraud)          | 📋 Planejado       |
+| Data Warehouse              | Snowflake                           | 📋 Planejado       |
+| Transformação             | dbt                                 | 📋 Planejado       |
+| BI / Visualização         | Looker Studio                       | 📋 Planejado       |
+| Testes de qualidade         | dbt tests + dbt-expectations        | 📋 Planejado       |
+
+---
+
+## Estrutura do Repositório
+
+```
+fintech-data-pipeline/
+├── README.md
+├── docs/
+│   ├── architecture.md        # Diagramas detalhados (a partir do Bloco de Modelagem)
+│   └── decisions/              # ADRs (Architecture Decision Records)
+├── airbyte/
+│   └── connections/            # Configurações exportadas (sem credenciais)
+├── dbt_project/
+│   ├── models/
+│   │   ├── staging/
+│   │   ├── intermediate/
+│   │   └── marts/
+│   └── tests/
+├── data_generator/              # Scripts Python para gerar dados sintéticos
+├── .env.example                 # Template de variáveis de ambiente (sem valores reais)
+└── .gitignore
+```
+
+---
+
+## Como rodar localmente
+
+> 🚧 Instruções completas de setup serão finalizadas ao fim do projeto. Progresso atual:
+
+### Pré-requisitos
+
+- Docker Engine
+- `abctl` (CLI do Airbyte)
+- Python 3.x (para o gerador de dados sintéticos)
+
+### 1. Airbyte
+
+```bash
+abctl local install
+abctl local credentials
+```
+
+Acesse `http://localhost:8000` com as credenciais geradas.
+
+> Para liberar recursos da máquina sem perder configurações:
+>
+> ```bash
+> abctl local uninstall --persisted
+> ```
+
+### 2. Demais etapas
+
+📋 Serão documentadas conforme implementadas (fonte sintética, dbt, warehouse).
+
+---
+
+## Fontes de Dados
+
+| Fonte                                        | Tipo                                  | Justificativa                                                            |
+| -------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------ |
+| PostgreSQL sintético (transações, contas) | Sintética (gerada via script Python) | Controle total para simular CDC, updates e schema drift intencionalmente |
+| API de câmbio (ex: Banco Central do Brasil) | Real                                  | Contexto de negócio real para conversão de moeda                       |
+| Kaggle - Credit Card Fraud Detection         | Real                                  | Volume e realismo para modelos analíticos finais                        |
+
+---
+
+## Data Quality & Testes
+
+> 📋Seção será preenchida a partir do bloco de testes automatizados no dbt.
+
+Princípios adotados (definidos desde o início do projeto):
+
+- Testes de **schema** (estrutura) são responsabilidade da camada de ingestão (Airbyte).
+- Testes de **regra de negócio** (ex: valores financeiros não podem ser negativos, exceto estornos) são responsabilidade do dbt.
+- Uso de `severity: error` vs `warn` calibrado por criticidade — evitando tanto falhas silenciosas quanto bloqueios desproporcionais ao risco real.
+
+---
+
+## Decisões Técnicas (ADRs)
+
+Registro das principais decisões de arquitetura tomadas até agora, e o porquê:
+
+### ADR-001: ELT em vez de ETL
+
+**Decisão:** Adotar arquitetura ELT (transformação dentro do warehouse via dbt), em vez de ETL clássico.
+**Motivo:** Preserva o dado bruto (bronze) de forma imutável, permitindo reprocessamento caso regras de negócio mudem, sem depender de reextração da fonte — especialmente relevante quando a fonte é transacional (dados podem ser sobrescritos/deletados na origem).
+**Trade-off aceito:** Maior consumo de storage (dado bruto retido) e necessidade de monitorar custo de compute no warehouse.
+
+### ADR-002: Airbyte self-hosted (via `abctl`) em vez de Airbyte Cloud
+
+**Decisão:** Rodar Airbyte localmente (self-hosted), usando `abctl` (Kubernetes-in-Docker via `kind`).
+**Motivo:** Ambiente de estudo sem custo de SaaS; replica o mesmo modelo operacional usado por empresas com exigências de residência de dados (compliance).
+**Trade-off aceito:** Overhead de manter a própria infraestrutura (cluster local), sem suporte gerenciado.
+
+---
+
+## Roadmap
+
+- [X] Setup do ambiente Airbyte (self-hosted)
+- [ ] Modelagem da fonte transacional sintética
+- [ ] Configuração de conexões (Full Refresh, Incremental, CDC)
+- [ ] Modelagem de dados (bronze/silver/gold)
+- [ ] Implementação dos modelos dbt
+- [ ] Testes de qualidade de dados
+- [ ] Deploy em produção (Snowflake)
+- [ ] Dashboard final (Looker Studio)
+
+---
+
+## Aprendizados
+
+> 📋 Seção para registrar decisões revisadas, erros encontrados e o que faria diferente — atualizada ao longo do projeto.
+
+---
+
+## Autor
+
+Projeto desenvolvido como parte de estudo prático em Engenharia de Dados (Airbyte, dbt, SQL, Snowflake).
