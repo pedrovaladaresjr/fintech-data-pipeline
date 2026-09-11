@@ -1,4 +1,3 @@
-
 # Fintech Data Pipeline
 
 > Pipeline de dados end-to-end para um cenário de fintech, cobrindo ingestão (EL), transformação (T) e modelagem analítica — construído como projeto de estudo aplicado em Engenharia de Dados.
@@ -167,6 +166,13 @@ Registro das principais decisões de arquitetura tomadas até agora, e o porquê
 **Decisão:** Rodar Airbyte localmente (self-hosted), usando `abctl` (Kubernetes-in-Docker via `kind`).
 **Motivo:** Ambiente de estudo sem custo de SaaS; replica o mesmo modelo operacional usado por empresas com exigências de residência de dados (compliance).
 **Trade-off aceito:** Overhead de manter a própria infraestrutura (cluster local), sem suporte gerenciado.
+
+### ADR-003: Carga direta no Snowflake em vez de Data Lake intermediário (S3)
+
+**Decisão:** Airbyte carrega os dados diretamente em um schema `raw` no Snowflake, sem uma camada de Data Lake (S3/GCS) intermediária persistente.
+**Motivo:** Para o volume de dados deste projeto (dados sintéticos + um dataset público), a complexidade operacional extra de manter e sincronizar uma camada S3 intermediária não se justifica. A imutabilidade da camada bronze é garantida dentro do próprio Snowflake (tabela `raw` nunca é sobrescrita).
+**Trade-off aceito:** Menor flexibilidade para múltiplos consumidores dos dados brutos (ex: um cluster Spark externo não conseguiria ler os dados brutos sem passar pelo Snowflake) e possível custo maior de storage a longo prazo comparado a S3.
+**Quando revisitar:** Se o volume de dados brutos crescer significativamente (ordem de terabytes raramente reconsultados) ou se surgir um segundo consumidor dos dados brutos além do próprio warehouse (ex: um pipeline de ML separado), vale reavaliar a introdução de uma camada S3 como landing zone.
 
 ---
 
