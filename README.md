@@ -158,7 +158,7 @@ Registro das principais decisões de arquitetura tomadas até agora, e o porquê
 ### ADR-001: ELT em vez de ETL
 
 **Decisão:** Adotar arquitetura ELT (transformação dentro do warehouse via dbt), em vez de ETL clássico.
-**Motivo:** Preserva o dado bruto (bronze) de forma imutável, permitindo reprocessamento caso regras de negócio mudem, sem depender de reextração da fonte — especialmente relevante quando a fonte é transacional (dados podem ser sobrescritos/deletados na origem).
+**Motivo:** Preserva o dado bruto (bronze) de forma imutável, permitindo reprocessamento caso regras de negócio mudem, sem depender de reextração da fonte, especialmente relevante quando a fonte é transacional (dados podem ser sobrescritos/deletados na origem).
 **Trade-off aceito:** Maior consumo de storage (dado bruto retido) e necessidade de monitorar custo de compute no warehouse.
 
 ### ADR-002: Airbyte self-hosted (via `abctl`) em vez de Airbyte Cloud
@@ -173,6 +173,14 @@ Registro das principais decisões de arquitetura tomadas até agora, e o porquê
 **Motivo:** Para o volume de dados deste projeto (dados sintéticos + um dataset público), a complexidade operacional extra de manter e sincronizar uma camada S3 intermediária não se justifica. A imutabilidade da camada bronze é garantida dentro do próprio Snowflake (tabela `raw` nunca é sobrescrita).
 **Trade-off aceito:** Menor flexibilidade para múltiplos consumidores dos dados brutos (ex: um cluster Spark externo não conseguiria ler os dados brutos sem passar pelo Snowflake) e possível custo maior de storage a longo prazo comparado a S3.
 **Quando revisitar:** Se o volume de dados brutos crescer significativamente (ordem de terabytes raramente reconsultados) ou se surgir um segundo consumidor dos dados brutos além do próprio warehouse (ex: um pipeline de ML separado), vale reavaliar a introdução de uma camada S3 como landing zone.
+
+### ADR-004: Incremental | Append + Deduped como sync mode principal (CDC como experimento paralelo)
+
+**Decisão:** A tabela `transacoes` será sincronizada via Incremental | Append + Deduped (Primary Key: `transacao_id`, Cursor Field: `updated_at`), não via CDC log-based.
+**Motivo:** No domínio de negócio (fintech), transações não sofrem hard delete por questões de auditoria/compliance, usam soft delete (campo de status). Isso elimina a principal vantagem do CDC (captura de deleções físicas) para este caso de uso, enquanto o CDC exige setup mais complexo (replication slot, `wal_level = logical`, permissões elevadas no Postgres).
+**Trade-off aceito:** Se um `UPDATE` na fonte não atualizar corretamente o campo `updated_at` (ex: script administrativo que ignora triggers), a mudança não será capturada, risco que o CDC log-based não teria.
+**Nota de aprendizado:** CDC será implementado como uma conexão paralela/experimental no projeto, especificamente para fins de estudo comparativo (documentado como aprendizado, não como necessidade do caso de uso principal).
+
 
 ---
 
