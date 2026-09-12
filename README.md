@@ -181,6 +181,12 @@ Registro das principais decisões de arquitetura tomadas até agora, e o porquê
 **Trade-off aceito:** Se um `UPDATE` na fonte não atualizar corretamente o campo `updated_at` (ex: script administrativo que ignora triggers), a mudança não será capturada, risco que o CDC log-based não teria.
 **Nota de aprendizado:** CDC será implementado como uma conexão paralela/experimental no projeto, especificamente para fins de estudo comparativo (documentado como aprendizado, não como necessidade do caso de uso principal).
 
+### ADR-005: Postgres local como Destination temporária (Snowflake ativado apenas a partir do bloco de dbt)
+
+**Decisão:** Usar um PostgreSQL local como Destination do Airbyte durante os blocos de Ingestão e Modelagem. O trial do Snowflake ($400 em créditos, válido por 30 dias corridos a partir da ativação) só será ativado ao iniciar o bloco de dbt.
+**Motivo:** O trial do Snowflake expira em 30 dias corridos independentemente do uso, ativá-lo prematuramente desperdiçaria tempo de trial em etapas que não dependem dele (configuração de Source/Sync Modes no Airbyte). Além disso, um Postgres local permite estudar configuração de banco de dados e planos de execução (relevante para otimização de queries) de forma mais transparente que um warehouse gerenciado.
+**Trade-off aceito:** Será necessário migrar a configuração de Destination do Airbyte de Postgres para Snowflake quando o trial for ativado, trabalho de reconfiguração que será documentado como parte do aprendizado.
+
 
 ---
 
