@@ -187,12 +187,12 @@ Registro das principais decisões de arquitetura tomadas até agora, e o porquê
 **Motivo:** O trial do Snowflake expira em 30 dias corridos independentemente do uso, ativá-lo prematuramente desperdiçaria tempo de trial em etapas que não dependem dele (configuração de Source/Sync Modes no Airbyte). Além disso, um Postgres local permite estudar configuração de banco de dados e planos de execução (relevante para otimização de queries) de forma mais transparente que um warehouse gerenciado.
 **Trade-off aceito:** Será necessário migrar a configuração de Destination do Airbyte de Postgres para Snowflake quando o trial for ativado, trabalho de reconfiguração que será documentado como parte do aprendizado.
 
-
 ---
 
 ## Roadmap
 
 - [X] Setup do ambiente Airbyte (self-hosted)
+- [X] Schema inicial do Postgres (clientes, contas, transacoes)
 - [ ] Modelagem da fonte transacional sintética
 - [ ] Configuração de conexões (Full Refresh, Incremental, CDC)
 - [ ] Modelagem de dados (bronze/silver/gold)
@@ -200,6 +200,16 @@ Registro das principais decisões de arquitetura tomadas até agora, e o porquê
 - [ ] Testes de qualidade de dados
 - [ ] Deploy em produção (Snowflake)
 - [ ] Dashboard final (Looker Studio)
+
+
+
+### Pendências técnicas em aberto
+
+* **Atualização de `atualizado_em`** : decidir entre trigger no Postgres (mais robusto, independe da aplicação) vs atualização manual no script Python gerador de dados (mais simples, mas replica o risco de "campo esquecido" discutido no ADR-004).
+
+
+
+* **Redundância de `id_cliente` em `transacoes`** : avaliar se mantém a coluna (facilita queries, denormalização proposital) ou remove e busca o cliente via `JOIN` com `contas` (evita duplicidade de dado, normalização mais estrita).
 
 ---
 
